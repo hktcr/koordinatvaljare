@@ -303,6 +303,36 @@
                 font-size: 0.9rem;
             }
         }
+
+        /* Floating GPS button for mobile */
+        .floating-gps {
+            display: none;
+            position: absolute;
+            bottom: 100px;
+            left: 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 14px 18px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            z-index: 15;
+        }
+
+        @media (max-width: 768px) {
+            .floating-gps {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            #gps-btn {
+                display: none;
+            }
+        }
     </style>
 </head>
 
@@ -330,6 +360,9 @@
         <div class="instructions" id="instructions">
             Klicka var som helst på kartan för att få koordinaterna
         </div>
+
+        <!-- Floating GPS button for mobile -->
+        <button class="floating-gps" onclick="gotoMyLocation()">📍 Min position</button>
 
         <!-- Mobile toggle for saved panel -->
         <button class="panel-toggle" id="panel-toggle" onclick="toggleSavedPanel()">📋</button>
