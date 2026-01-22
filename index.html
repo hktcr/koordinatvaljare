@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="sv">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koordinatväljare — Terrängkarta</title>
+
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <style>
+        :root {
+            --color-bg: #f8fafc;
+            --color-surface: #ffffff;
+            --color-border: #e2e8f0;
+            --color-text: #1e293b;
+            --color-primary: #0f766e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 16px 24px;
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .coords-display {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .coord-box {
+            background: var(--color-bg);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        .coord-box label {
+            display: block;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 4px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .coord-value {
+            font-weight: 600;
+            color: var(--color-primary);
+            user-select: all;
+            cursor: text;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            background: var(--color-primary);
+            color: white;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #map {
+            flex: 1;
+        }
+
+        .instructions {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 0.875rem;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .instructions.hidden {
+            display: none;
+        }
+
+        .saved-coords {
+            position: absolute;
+            top: 80px;
+            right: 16px;
+            background: var(--color-surface);
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            min-width: 280px;
+            max-height: calc(100vh - 160px);
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .saved-coords h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 12px;
+        }
+
+        .saved-list {
+            list-style: none;
+        }
+
+        .saved-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: var(--color-bg);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            font-family: 'SF Mono', monospace;
+        }
+
+        .saved-item .label {
+            font-weight: 600;
+            color: var(--color-primary);
+            margin-right: 8px;
+        }
+
+        .saved-item button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            opacity: 0.5;
+            font-size: 1rem;
+        }
+
+        .saved-item button:hover {
+            opacity: 1;
+        }
+
+        .export-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .export-section textarea {
+            width: 100%;
+            height: 80px;
+            font-family: 'SF Mono', monospace;
+            font-size: 0.7rem;
+            padding: 8px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            resize: none;
+        }
+
+        .maplibregl-popup-content {
+            padding: 8px 12px;
+            font-size: 0.875rem;
+        }
+
+        .marker-label {
+            background: var(--color-primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>📍 Koordinatväljare</h1>
+            <div class="coords-display">
+                <div class="coord-box">
+                    <label>Latitud (N)</label>
+                    <div class="coord-value" id="lat-display">—</div>
+                </div>
+                <div class="coord-box">
+                    <label>Longitud (E)</label>
+                    <div class="coord-value" id="lon-display">—</div>
+                </div>
+                <button class="btn" id="save-btn" disabled onclick="saveCoord()">Spara punkt</button>
+            </div>
+        </header>
+
+        <div id="map"></div>
+
+        <div class="instructions" id="instructions">
+            Klicka var som helst på kartan för att få koordinaterna
+        </div>
+
+        <div class="saved-coords" id="saved-panel">
+            <h3>Sparade punkter</h3>
+
+            <!-- Inline save form -->
+            <div id="save-form"
+                style="display: none; margin-bottom: 12px; padding: 8px; background: #f0fdf4; border-radius: 6px; border: 1px solid #86efac;">
+                <div style="font-size: 0.75rem; color: #166534; margin-bottom: 4px;">Spara punkt:</div>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="point-label" placeholder="Namn (t.ex. NV-hörn)"
+                        style="flex: 1; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.875rem;">
+                    <button class="btn" onclick="confirmSave()" style="padding: 6px 12px;">✓</button>
+                    <button class="btn" onclick="cancelSave()"
+                        style="padding: 6px 12px; background: #94a3b8;">✕</button>
+                </div>
+            </div>
+
+            <ul class="saved-list" id="saved-list">
+                <li style="color: #64748b; font-style: italic; font-size: 0.8rem;">Inga punkter sparade ännu</li>
+            </ul>
+            <div class="export-section">
+                <button class="btn" style="width: 100%; margin-bottom: 8px;" onclick="copyBounds()">📋 Kopiera som
+                    bounds</button>
+                <textarea id="bounds-output" readonly
+                    placeholder="Spara minst 2 punkter för att få bounds..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCoords = null;
+        let savedPoints = [];
+        let markers = [];
+
+        // Initialize map centered on Söderåsen
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    'opentopomap': {
+                        type: 'raster',
+                        tiles: [
+                            'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+                            'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+                            'https://c.tile.opentopomap.org/{z}/{x}/{y}.png'
+                        ],
+                        tileSize: 256,
+                        attribution: '© OpenTopoMap (CC-BY-SA)'
+                    }
+                },
+                layers: [{
+                    id: 'opentopomap-layer',
+                    type: 'raster',
+                    source: 'opentopomap',
+                    minzoom: 0,
+                    maxzoom: 17
+                }]
+            },
+            center: [13.25, 56.02], // Söderåsen
+            zoom: 11
+        });
+
+        map.addControl(new maplibregl.NavigationControl(), 'top-left');
+        map.addControl(new maplibregl.ScaleControl({ maxWidth: 200 }), 'bottom-left');
+
+        // Click handler
+        map.on('click', (e) => {
+            currentCoords = {
+                lat: e.lngLat.lat,
+                lon: e.lngLat.lng
+            };
+
+            document.getElementById('lat-display').textContent = currentCoords.lat.toFixed(6);
+            document.getElementById('lon-display').textContent = currentCoords.lon.toFixed(6);
+            document.getElementById('save-btn').disabled = false;
+            document.getElementById('instructions').classList.add('hidden');
+        });
+
+        // Mouse move for live coords
+        map.on('mousemove', (e) => {
+            map.getCanvas().style.cursor = 'crosshair';
+        });
+
+        function saveCoord() {
+            if (!currentCoords) return;
+
+            // Show inline save form
+            document.getElementById('save-form').style.display = 'block';
+            const input = document.getElementById('point-label');
+            input.value = `P${savedPoints.length + 1}`;
+            input.focus();
+            input.select();
+        }
+
+        function confirmSave() {
+            const label = document.getElementById('point-label').value.trim() || `P${savedPoints.length + 1}`;
+
+            const point = {
+                label: label,
+                lat: currentCoords.lat,
+                lon: currentCoords.lon
+            };
+
+            savedPoints.push(point);
+
+            // Add marker
+            const el = document.createElement('div');
+            el.className = 'marker-label';
+            el.textContent = label;
+
+            const marker = new maplibregl.Marker({ element: el })
+                .setLngLat([point.lon, point.lat])
+                .addTo(map);
+            markers.push(marker);
+
+            updateSavedList();
+            updateBoundsOutput();
+
+            // Hide form
+            document.getElementById('save-form').style.display = 'none';
+        }
+
+        function cancelSave() {
+            document.getElementById('save-form').style.display = 'none';
+        }
+
+        function updateSavedList() {
+            const list = document.getElementById('saved-list');
+
+            if (savedPoints.length === 0) {
+                list.innerHTML = '<li style="color: #64748b; font-style: italic; font-size: 0.8rem;">Inga punkter sparade ännu</li>';
+                return;
+            }
+
+            list.innerHTML = savedPoints.map((p, i) => `
+                <li class="saved-item">
+                    <span>
+                        <span class="label">${p.label}</span>
+                        ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}
+                    </span>
+                    <button onclick="removePoint(${i})" title="Ta bort">✕</button>
+                </li>
+            `).join('');
+        }
+
+        function removePoint(index) {
+            savedPoints.splice(index, 1);
+            markers[index].remove();
+            markers.splice(index, 1);
+            updateSavedList();
+            updateBoundsOutput();
+        }
+
+        function updateBoundsOutput() {
+            const output = document.getElementById('bounds-output');
+
+            if (savedPoints.length < 2) {
+                output.value = '';
+                output.placeholder = 'Spara minst 2 punkter för att få bounds...';
+                return;
+            }
+
+            const lats = savedPoints.map(p => p.lat);
+            const lons = savedPoints.map(p => p.lon);
+
+            const bounds = {
+                north: Math.max(...lats).toFixed(6),
+                south: Math.min(...lats).toFixed(6),
+                east: Math.max(...lons).toFixed(6),
+                west: Math.min(...lons).toFixed(6)
+            };
+
+            output.value = `north: ${bounds.north}
+south: ${bounds.south}
+east: ${bounds.east}
+west: ${bounds.west}`;
+        }
+
+        function copyBounds() {
+            const output = document.getElementById('bounds-output');
+            if (!output.value) {
+                alert('Spara minst 2 punkter först!');
+                return;
+            }
+
+            navigator.clipboard.writeText(output.value).then(() => {
+                alert('Koordinater kopierade till urklipp!');
+            });
+        }
+    </script>
+</body>
+
+</html>
