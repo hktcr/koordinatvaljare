@@ -230,6 +230,8 @@
                     <div class="coord-value" id="lon-display">—</div>
                 </div>
                 <button class="btn" id="save-btn" disabled onclick="saveCoord()">Spara punkt</button>
+                <button class="btn" id="gps-btn" onclick="gotoMyLocation()" style="background: #3b82f6;"
+                    title="Gå till min position">📍 GPS</button>
             </div>
         </header>
 
@@ -427,6 +429,66 @@ west: ${bounds.west}`;
             navigator.clipboard.writeText(output.value).then(() => {
                 alert('Koordinater kopierade till urklipp!');
             });
+        }
+
+        // GPS location
+        let myLocationMarker = null;
+
+        function gotoMyLocation() {
+            const btn = document.getElementById('gps-btn');
+            btn.textContent = '⏳ ...';
+            btn.disabled = true;
+
+            if (!navigator.geolocation) {
+                alert('Geolocation stöds inte av din webbläsare');
+                btn.textContent = '📍 GPS';
+                btn.disabled = false;
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+
+                    // Fly to position
+                    map.flyTo({
+                        center: [longitude, latitude],
+                        zoom: 14
+                    });
+
+                    // Update coordinate display
+                    currentCoords = { lat: latitude, lon: longitude };
+                    document.getElementById('lat-display').textContent = latitude.toFixed(6);
+                    document.getElementById('lon-display').textContent = longitude.toFixed(6);
+                    document.getElementById('save-btn').disabled = false;
+                    document.getElementById('instructions').classList.add('hidden');
+
+                    // Remove old marker
+                    if (myLocationMarker) {
+                        myLocationMarker.remove();
+                    }
+
+                    // Add blue marker for current position
+                    const el = document.createElement('div');
+                    el.style.cssText = 'width: 16px; height: 16px; background: #3b82f6; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);';
+                    myLocationMarker = new maplibregl.Marker({ element: el })
+                        .setLngLat([longitude, latitude])
+                        .addTo(map);
+
+                    btn.textContent = '📍 GPS';
+                    btn.disabled = false;
+                },
+                (error) => {
+                    let msg = 'Kunde inte hämta position';
+                    if (error.code === 1) msg = 'Åtkomst nekad - tillåt platsåtkomst i webbläsaren';
+                    else if (error.code === 2) msg = 'Position ej tillgänglig';
+                    else if (error.code === 3) msg = 'Timeout - försök igen';
+                    alert(msg);
+                    btn.textContent = '📍 GPS';
+                    btn.disabled = false;
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+            );
         }
     </script>
 </body>
